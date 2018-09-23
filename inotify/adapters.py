@@ -138,19 +138,10 @@ class Inotify(object):
         self._remove_watch(wd, path, superficial)
 
     def _get_event_names(self, event_type):
-        names = []
-        for bit, name in inotify.constants.MASK_LOOKUP.items():
-            if event_type & bit:
-                names.append(name)
-                event_type -= bit
-
-                if event_type == 0:
-                    break
-
-        assert event_type == 0, \
-               "We could not resolve all event-types: (%d)" % (event_type,)
-
-        return names
+        try:
+            return inotify.constants.MASK_LOOKUP_COMB[event_type][:]
+        except KeyError as ex:
+            raise AssertionError("We could not resolve all event-types (%x)" % event_type)
 
     def _handle_inotify_event(self, wd):
         """Handle a series of events coming-in from inotify."""
