@@ -15,7 +15,7 @@ class InotifyError(Exception):
         self.errno = errnum
         try:
             errmsg = os.strerror(errnum)
-        except ValueError as ex:
+        except ValueError:
             errmsg = ""
         message += " ERRNO=%d %s" % (errnum, errmsg)
 
