@@ -7,6 +7,7 @@ import time
 
 from errno import EINTR
 
+import fcntl
 import inotify.constants
 import inotify.calls
 
@@ -57,6 +58,8 @@ class Inotify(object):
         self.__inotify_fd = inotify.calls.inotify_init()
         _LOGGER.debug("Inotify handle is (%d).", self.__inotify_fd)
 
+        flag = fcntl.fcntl(self.__inotify_fd, fcntl.F_GETFL)
+        fcntl.fcntl(self.__inotify_fd, fcntl.F_SETFL, flag | os.O_NONBLOCK)
         self.__epoll = select.epoll()
         self.__epoll.register(self.__inotify_fd, select.POLLIN)
 
