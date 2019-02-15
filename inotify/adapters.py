@@ -14,28 +14,20 @@ import inotify.calls
 # Constants.
 
 _DEFAULT_EPOLL_BLOCK_DURATION_S = 1
-_HEADER_STRUCT_FORMAT = 'iIII'
+_HEADER_STRUCT_FORMAT = "iIII"
 
-_DEFAULT_TERMINAL_EVENTS = (
-    'IN_Q_OVERFLOW',
-    'IN_UNMOUNT',
-)
+_DEFAULT_TERMINAL_EVENTS = ("IN_Q_OVERFLOW", "IN_UNMOUNT")
 
 # Globals.
 
 _LOGGER = logging.getLogger(__name__)
 
 _INOTIFY_EVENT = collections.namedtuple(
-                    '_INOTIFY_EVENT',
-                    [
-                        'wd',
-                        'mask',
-                        'cookie',
-                        'len',
-                    ])
+    "_INOTIFY_EVENT", ["wd", "mask", "cookie", "len"]
+)
 
 _STRUCT_HEADER_LENGTH = struct.calcsize(_HEADER_STRUCT_FORMAT)
-_IS_DEBUG = bool(int(os.environ.get('DEBUG', '0')))
+_IS_DEBUG = bool(int(os.environ.get("DEBUG", "0")))
 
 
 class EventTimeoutException(Exception):
@@ -53,7 +45,7 @@ class Inotify(object):
         self.__block_duration = block_duration_s
         self.__watches = {}
         self.__watches_r = {}
-        self.__buffer = b''
+        self.__buffer = b""
 
         self.__inotify_fd = inotify.calls.inotify_init()
         _LOGGER.debug("Inotify handle is (%d).", self.__inotify_fd)
@@ -93,7 +85,7 @@ class Inotify(object):
             _LOGGER.warning("Path already being watched: [%s]", path_unicode)
             return
 
-        path_bytes = path_unicode.encode('utf8')
+        path_bytes = path_unicode.encode("utf8")
 
         wd = inotify.calls.inotify_add_watch(self.__inotify_fd, path_bytes, mask)
         _LOGGER.debug("Added watch (%d): [%s]", wd, path_unicode)
@@ -104,8 +96,7 @@ class Inotify(object):
         return wd
 
     def _remove_watch(self, wd, path, superficial=False):
-        _LOGGER.debug("Removing watch for watch-handle (%d): [%s]",
-                      wd, path)
+        _LOGGER.debug("Removing watch for watch-handle (%d): [%s]", wd, path)
 
         if superficial is not None:
             del self.__watches[path]
@@ -115,7 +106,6 @@ class Inotify(object):
             return
         inotify.calls.inotify_rm_watch(self.__inotify_fd, wd)
         _LOGGER.debug(".. removed from inotify")
-
 
     def remove_watch(self, path, superficial=False):
         """Remove our tracking information and call inotify to stop watching
@@ -144,7 +134,9 @@ class Inotify(object):
         try:
             return inotify.constants.MASK_LOOKUP_COMB[event_type][:]
         except KeyError as ex:
-            raise AssertionError("We could not resolve all event-types (%x)" % event_type)
+            raise AssertionError(
+                "We could not resolve all event-types (%x)" % event_type
+            )
 
     def _handle_inotify_event(self, wd):
         """Handle a series of events coming-in from inotify."""
@@ -166,28 +158,26 @@ class Inotify(object):
 
             peek_slice = self.__buffer[:_STRUCT_HEADER_LENGTH]
 
-            header_raw = struct.unpack(
-                            _HEADER_STRUCT_FORMAT,
-                            peek_slice)
+            header_raw = struct.unpack(_HEADER_STRUCT_FORMAT, peek_slice)
 
             header = _INOTIFY_EVENT(*header_raw)
             type_names = self._get_event_names(header.mask)
             _LOGGER.debug("Events received in stream: {}".format(type_names))
 
-            event_length = (_STRUCT_HEADER_LENGTH + header.len)
+            event_length = _STRUCT_HEADER_LENGTH + header.len
             if length < event_length:
                 return
 
             filename = self.__buffer[_STRUCT_HEADER_LENGTH:event_length]
 
             # Our filename is 16-byte aligned and right-padded with NULs.
-            filename_bytes = filename.rstrip(b'\0')
+            filename_bytes = filename.rstrip(b"\0")
 
             self.__buffer = self.__buffer[event_length:]
 
             path = self.__watches_r.get(header.wd)
             if path is not None:
-                filename_unicode = filename_bytes.decode('utf8')
+                filename_unicode = filename_bytes.decode("utf8")
                 yield (header, type_names, path, filename_unicode)
 
             buffer_length = len(self.__buffer)
@@ -195,8 +185,12 @@ class Inotify(object):
                 break
 
     def event_gen(
-            self, timeout_s=None, yield_nones=True, filter_predicate=None,
-            terminal_events=_DEFAULT_TERMINAL_EVENTS):
+        self,
+        timeout_s=None,
+        yield_nones=True,
+        filter_predicate=None,
+        terminal_events=_DEFAULT_TERMINAL_EVENTS,
+    ):
         """Yield one event after another. If `timeout_s` is provided, we'll
         break when no event is received for that many seconds.
         """
@@ -233,16 +227,19 @@ class Inotify(object):
                 names = self._get_event_names(event_type)
                 _LOGGER.debug("Events received from epoll: {}".format(names))
 
-                for (header, type_names, path, filename) \
-                        in self._handle_inotify_event(fd):
+                for (header, type_names, path, filename) in self._handle_inotify_event(
+                    fd
+                ):
                     last_hit_s = time.time()
 
                     e = (header, type_names, path, filename)
                     for type_name in type_names:
-                        if filter_predicate is not None and \
-                           filter_predicate(type_name, e) is False:
-                             self.__last_success_return = (type_name, e)
-                             return
+                        if (
+                            filter_predicate is not None
+                            and filter_predicate(type_name, e) is False
+                        ):
+                            self.__last_success_return = (type_name, e)
+                            return
                         elif type_name in terminal_events:
                             raise TerminalEventException(type_name, e)
 
@@ -262,20 +259,25 @@ class Inotify(object):
 
 
 class _BaseTree(object):
-    def __init__(self, mask=inotify.constants.IN_ALL_EVENTS,
-                 block_duration_s=_DEFAULT_EPOLL_BLOCK_DURATION_S):
+    def __init__(
+        self,
+        mask=inotify.constants.IN_ALL_EVENTS,
+        block_duration_s=_DEFAULT_EPOLL_BLOCK_DURATION_S,
+    ):
 
         # No matter what we actually received as the mask, make sure we have
         # the minimum that we require to curate our list of watches.
         #
         # todo: we really should have two masks... the combined one (requested|needed)
         # and the user specified mask for the events he wants to receive from tree...
-        self._mask = mask | \
-                        inotify.constants.IN_ISDIR | \
-                        inotify.constants.IN_CREATE | \
-                        inotify.constants.IN_MOVED_TO | \
-                        inotify.constants.IN_DELETE | \
-                        inotify.constants.IN_MOVED_FROM
+        self._mask = (
+            mask
+            | inotify.constants.IN_ISDIR
+            | inotify.constants.IN_CREATE
+            | inotify.constants.IN_MOVED_TO
+            | inotify.constants.IN_DELETE
+            | inotify.constants.IN_MOVED_FROM
+        )
 
         self._i = Inotify(block_duration_s=block_duration_s)
 
@@ -296,11 +298,11 @@ class _BaseTree(object):
                     full_path = os.path.join(path, filename)
 
                     if (
-                        (header.mask & inotify.constants.IN_MOVED_TO) or
-                        (header.mask & inotify.constants.IN_CREATE)
-                       ) and \
-                       (
-                        os.path.exists(full_path) is True or
+                        (header.mask & inotify.constants.IN_MOVED_TO)
+                        or (header.mask & inotify.constants.IN_CREATE)
+                    ) and (
+                        os.path.exists(full_path) is True
+                        or
                         # todo: as long as the "Path already being watche/not in watch list" warnings
                         # instead of exceptions are in place, it should really be default to also log
                         # only a warning if target folder does not exists in tree autodiscover mode.
@@ -309,28 +311,35 @@ class _BaseTree(object):
                         # to event_gen but to InotifyTree(s) constructor (at least set default there)
                         # to not steal someones use case to specify this differently for each event_call??
                         ignore_missing_new_folders is False
-                       ):
-                        _LOGGER.debug("A directory has been created. We're "
-                                      "adding a watch on it (because we're "
-                                      "being recursive): [%s]", full_path)
-
+                    ):
+                        _LOGGER.debug(
+                            "A directory has been created. We're "
+                            "adding a watch on it (because we're "
+                            "being recursive): [%s]",
+                            full_path,
+                        )
 
                         self._i.add_watch(full_path, self._mask)
 
                     if header.mask & inotify.constants.IN_DELETE:
-                        _LOGGER.debug("A directory has been removed. We're "
-                                      "being recursive, but it would have "
-                                      "automatically been deregistered: [%s]",
-                                      full_path)
+                        _LOGGER.debug(
+                            "A directory has been removed. We're "
+                            "being recursive, but it would have "
+                            "automatically been deregistered: [%s]",
+                            full_path,
+                        )
 
                         # The watch would've already been cleaned-up internally.
                         self._i.remove_watch(full_path, superficial=True)
                     elif header.mask & inotify.constants.IN_MOVED_FROM:
-                        _LOGGER.debug("A directory has been renamed. We're "
-                                      "being recursive, we will remove watch "
-                                      "from it and re-add with IN_MOVED_TO "
-                                      "if target parent dir is within "
-                                      "our tree: [%s]", full_path)
+                        _LOGGER.debug(
+                            "A directory has been renamed. We're "
+                            "being recursive, we will remove watch "
+                            "from it and re-add with IN_MOVED_TO "
+                            "if target parent dir is within "
+                            "our tree: [%s]",
+                            full_path,
+                        )
 
                         try:
                             self._i.remove_watch(full_path, superficial=False)
@@ -350,8 +359,12 @@ class _BaseTree(object):
 class InotifyTree(_BaseTree):
     """Recursively watch a path."""
 
-    def __init__(self, path, mask=inotify.constants.IN_ALL_EVENTS,
-                 block_duration_s=_DEFAULT_EPOLL_BLOCK_DURATION_S):
+    def __init__(
+        self,
+        path,
+        mask=inotify.constants.IN_ALL_EVENTS,
+        block_duration_s=_DEFAULT_EPOLL_BLOCK_DURATION_S,
+    ):
         super(InotifyTree, self).__init__(mask=mask, block_duration_s=block_duration_s)
 
         self.__root_path = path
@@ -384,14 +397,20 @@ class InotifyTree(_BaseTree):
 class InotifyTrees(_BaseTree):
     """Recursively watch over a list of trees."""
 
-    def __init__(self, paths, mask=inotify.constants.IN_ALL_EVENTS,
-                 block_duration_s=_DEFAULT_EPOLL_BLOCK_DURATION_S):
+    def __init__(
+        self,
+        paths,
+        mask=inotify.constants.IN_ALL_EVENTS,
+        block_duration_s=_DEFAULT_EPOLL_BLOCK_DURATION_S,
+    ):
         super(InotifyTrees, self).__init__(mask=mask, block_duration_s=block_duration_s)
 
         self.__load_trees(paths)
 
     def __load_trees(self, paths):
-        _LOGGER.debug("Adding initial watches on trees: [%s]", ",".join(map(str, paths)))
+        _LOGGER.debug(
+            "Adding initial watches on trees: [%s]", ",".join(map(str, paths))
+        )
 
         found = []
 
@@ -408,7 +427,6 @@ class InotifyTrees(_BaseTree):
                     continue
 
                 q.append(entry_filepath)
-
 
         for path in found:
             self._i.add_watch(path, self._mask)

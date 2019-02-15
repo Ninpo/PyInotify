@@ -6,6 +6,7 @@ import contextlib
 
 _LOGGER = logging.getLogger(__name__)
 
+
 @contextlib.contextmanager
 def temp_path():
     path = tempfile.mkdtemp()
