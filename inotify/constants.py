@@ -59,8 +59,6 @@ IN_ONESHOT = 0x80000000  # Only send event once.
 X_IN_ALL_EVENTS = IN_ALL_EVENTS | IN_UNMOUNT | IN_Q_OVERFLOW | IN_IGNORED
 
 MASK_LOOKUP = {
-    0o2000000: "IN_CLOEXEC",
-    0o0004000: "IN_NONBLOCK",
     ## Supported events suitable for MASK parameter of INOTIFY_ADD_WATCH.
     0x00000001: "IN_ACCESS",
     0x00000002: "IN_MODIFY",
